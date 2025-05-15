@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               ghc-debugger
-version:            0.2.0.0
+version:            0.3.0.0
 synopsis:
     A step-through machine-interface debugger for GHC Haskell
 
