@@ -39,6 +39,7 @@ describe("Debug Adapter Tests", function () {
             }, 15000); // 15 second timeout
 
             debuggerProcess.stdout.on('data', data => {
+                // UNCOMMENT THE FOLLOWING LINE TO DEBUG WHAT THE DEBUGGER IS DOING
                 // console.log(data.toString())
                 const text = data.toString();
                 if (text.includes('Running')) {
@@ -235,9 +236,6 @@ describe("Debug Adapter Tests", function () {
 
             const expected = { path: config.projectRoot + "/" + config.entryFile, line: 15 }
 
-            dc.configurationSequence(),
-            dc.launch(config), 
-
             await dc.hitBreakpoint(config, { path: config.entryFile, line: 15 }, expected, expected);
 
             const variables = await fetchLocalVars()
@@ -274,9 +272,6 @@ describe("Debug Adapter Tests", function () {
 
             const expected = { path: config.projectRoot + "/" + config.entryFile, line: 19 }
 
-            dc.configurationSequence(),
-            dc.launch(config), 
-
             await dc.hitBreakpoint(config, { path: config.entryFile, line: 19 }, expected, expected);
 
             // get the locals
@@ -301,6 +296,73 @@ describe("Debug Adapter Tests", function () {
             // Finally, we should be at the OK constructor
             const focusF = await forceLazy(focus);
             assert.strictEqual(focusF.value, 'OK');
+        })
+    })
+
+
+    describe("Stepping out", function () {
+
+        // Mimics GHC's T26042b
+        it('without tail calls', async () => {
+
+            let config = mkConfig({
+                  projectRoot: "/data/T6",
+                  entryFile: "MainA.hs",
+                  entryPoint: "main",
+                  entryArgs: [],
+                  extraGhcArgs: []
+                })
+
+            const expected = (line) => ({ path: config.projectRoot + "/" + config.entryFile, line: line });
+
+            await dc.hitBreakpoint(config, { path: config.entryFile, line: 9 }, expected(9), expected(9));
+
+            // foo to bar
+            await dc.stepOutRequest({threadId: 0});
+            await dc.assertStoppedLocation('step', expected(20));
+
+            // bar back to foo
+            await dc.stepOutRequest({threadId: 0});
+            await dc.assertStoppedLocation('step', expected(14));
+
+            // back to main
+            await dc.stepOutRequest({threadId: 0});
+            await dc.assertStoppedLocation('step', expected(6));
+
+            // jump to thunk for `a`
+            await dc.stepOutRequest({threadId: 0});
+            await dc.assertStoppedLocation('step', expected(18));
+        })
+
+        // Mimics GHC's T26042c
+        it('with tail calls', async () => {
+
+            let config = mkConfig({
+                  projectRoot: "/data/T6",
+                  entryFile: "MainB.hs",
+                  entryPoint: "main",
+                  entryArgs: [],
+                  extraGhcArgs: []
+                })
+
+            const expected = (line) => ({ path: config.projectRoot + "/" + config.entryFile, line: line });
+
+            await dc.hitBreakpoint(config, { path: config.entryFile, line: 9 }, expected(9), expected(9));
+
+            // step out of foo True and observe that we have skipped its call in bar,
+            // and the call of bar in foo False.
+            // we go straight to `main`.
+            await dc.stepOutRequest({threadId: 0});
+            await dc.assertStoppedLocation('step', expected(6))
+
+            // stepping out again jumps to the thunk for `a`
+            await dc.stepOutRequest({threadId: 0});
+            await dc.assertStoppedLocation('step', expected(17))
+
+            // more thunks
+            await dc.stepOutRequest({threadId: 0});
+            await dc.assertStoppedLocation('step', expected(13))
+
         })
     })
 })
