@@ -10,9 +10,6 @@ import Data.IORef
 import Data.Bits (xor)
 
 import GHC
-#if MIN_VERSION_ghc(9,13,20250417)
-import GHC.Types.Name.Occurrence (sizeOccEnv)
-#endif
 import GHC.Utils.Error (logOutput)
 import GHC.Driver.DynFlags as GHC
 import GHC.Driver.Ppr as GHC

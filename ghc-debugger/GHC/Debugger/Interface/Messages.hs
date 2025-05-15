@@ -63,6 +63,9 @@ data Command
   -- | Single step always to the next breakpoint. Used for "step-in".
   | DoSingleStep
 
+  -- | Step out to the breakpoint immediately following a return.
+  | DoStepOut
+
   -- | Execute a prog with debugging enabled. Breaks on the existing breakpoints.
   --
   -- Constructed with an entry point function name and the arguments to pass it.

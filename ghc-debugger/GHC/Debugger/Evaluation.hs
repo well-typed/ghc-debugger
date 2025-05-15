@@ -8,9 +8,6 @@ import Control.Monad.Catch
 import Data.Maybe
 
 import GHC
-#if MIN_VERSION_ghc(9,13,20250417)
-import GHC.Types.Name.Occurrence (sizeOccEnv)
-#endif
 import GHC.Builtin.Names (gHC_INTERNAL_GHCI_HELPERS)
 import GHC.Data.FastString
 import GHC.Driver.DynFlags as GHC
@@ -97,6 +94,16 @@ doSingleStep = do
   leaveSuspendedState
   GHC.resumeExec SingleStep Nothing
     >>= handleExecResult
+
+doStepOut :: Debugger EvalResult
+doStepOut = do
+#if MIN_VERSION_GLASGOW_HASKELL(9,13,20250514,0)
+  leaveSuspendedState
+  GHC.resumeExec StepOut Nothing
+    >>= handleExecResult
+#else
+  doSingleStep -- NOTE: stub!
+#endif
 
 -- | Resume execution but stop at the next tick within the same function.
 --

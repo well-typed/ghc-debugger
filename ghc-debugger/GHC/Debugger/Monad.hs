@@ -13,8 +13,6 @@ import Control.Exception (assert)
 import Control.Monad.Catch
 
 import GHC
-import GHC.Types.Name (mkDerivedInternalName)
-import GHC.Types.Name.Occurrence (mkVarOcc)
 import qualified GHCi.BreakArray as BA
 import GHC.Driver.DynFlags as GHC
 import GHC.Driver.Phases as GHC
@@ -30,7 +28,6 @@ import GHC.Runtime.Loader as GHC
 import GHC.Runtime.Interpreter as GHCi
 import GHC.Runtime.Heap.Inspect
 import GHC.Unit.Module.Env as GHC
-import GHC.Types.Name.Env
 import GHC.Driver.Env
 
 import Data.IORef

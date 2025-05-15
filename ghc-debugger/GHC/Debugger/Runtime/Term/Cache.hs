@@ -1,11 +1,7 @@
 {-# LANGUAGE GADTs #-}
 module GHC.Debugger.Runtime.Term.Cache where
 
-import GHC
-import GHC.Types.Id
-import GHC.Tc.Utils.TcType
 import GHC.Runtime.Eval
-import GHC.Types.Unique.Supply (uniqFromTag)
 import GHC.Types.Var.Env
 
 import GHC.Debugger.Runtime.Term.Key

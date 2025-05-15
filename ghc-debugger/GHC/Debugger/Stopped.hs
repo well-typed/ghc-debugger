@@ -5,13 +5,10 @@ module GHC.Debugger.Stopped where
 
 import Data.IORef
 import Control.Monad.Reader
-import Control.Monad.IO.Class
 
 import GHC
 import GHC.Types.Unique.FM
-#if MIN_VERSION_ghc(9,13,20250417)
 import GHC.Types.Name.Occurrence (sizeOccEnv)
-#endif
 import GHC.Types.Name.Reader
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.Module.ModDetails
@@ -107,11 +104,7 @@ getScopes = GHC.getCurrentBreakSpan >>= \case
                     }
         , ScopeInfo { kind = GlobalVariablesScope
                     , expensive = True
-#if MIN_VERSION_ghc(9,13,20250417)
                     , numVars = Just (sizeOccEnv imported)
-#else
-                    , numVars = Nothing
-#endif
                     , sourceSpan
                     }
         ]
@@ -182,7 +175,7 @@ getVariables vk = do
                             else seqTerm term
                 -- update cache with the forced term right away instead of invalidating it.
                 -- TODO: is this the best place to have this update? what's the better abstraction?
-                asks termCache >>= \r -> liftIO $ modifyIORef' r (insertTermCache key term')
+                asks termCache >>= \ref -> liftIO $ modifyIORef' ref (insertTermCache key term')
                 vi <- termToVarInfo key term'
 
                 return (Left vi)
@@ -262,9 +255,5 @@ getTopImported modl = do
   hsc_env <- getSession
   liftIO $ HUG.lookupHugByModule modl (hsc_HUG hsc_env) >>= \case
     Nothing -> return emptyGlobalRdrEnv
-#if MIN_VERSION_ghc(9,13,20250417)
     Just hmi -> mkTopLevImportedEnv hsc_env hmi
-#else
-    Just hmi -> return emptyGlobalRdrEnv
-#endif
 

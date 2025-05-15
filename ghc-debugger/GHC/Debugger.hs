@@ -6,10 +6,6 @@ module GHC.Debugger where
 import System.Exit
 import Control.Monad.IO.Class
 
-#if MIN_VERSION_ghc(9,13,20250417)
-import GHC.Types.Name.Occurrence (sizeOccEnv)
-#endif
-
 import GHC.Debugger.Breakpoint
 import GHC.Debugger.Evaluation
 import GHC.Debugger.Stopped
@@ -45,6 +41,7 @@ execute = \case
   DoEval exp_s -> DidEval <$> doEval exp_s
   DoContinue -> DidContinue <$> doContinue
   DoSingleStep -> DidStep <$> doSingleStep
+  DoStepOut -> DidStep <$> doStepOut
   DoStepLocal -> DidStep <$> doLocalStep
   DebugExecution { entryPoint, runArgs } -> DidExec <$> debugExecution entryPoint runArgs
   TerminateProcess -> liftIO $ do
