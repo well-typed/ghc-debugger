@@ -10,4 +10,5 @@ node_modules:
 
 test: node_modules
 	# PATH=$(dir $(GHC)):$(dir $(DEBUGGER)):$$PATH ./node_modules/.bin/mocha -f 'allow arbitrarily deep'
-	PATH=$(dir $(GHC)):$(dir $(DEBUGGER)):$$PATH ./node_modules/.bin/mocha --parallel
+	# nix-shell -p nodejs --run 'PATH=$(dir $(GHC)):$(dir $(DEBUGGER)):$$PATH ./node_modules/.bin/mocha'
+	nix-shell -p nodejs --run 'PATH=$(dir $(GHC)):$(dir $(DEBUGGER)):$$PATH ./node_modules/.bin/mocha --parallel'

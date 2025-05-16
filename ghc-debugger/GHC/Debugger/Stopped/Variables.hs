@@ -3,13 +3,10 @@
    TypeApplications, ScopedTypeVariables, BangPatterns #-}
 module GHC.Debugger.Stopped.Variables where
 
-import Control.Monad
-
 import GHC
 import GHC.Types.FieldLabel
 import GHC.Runtime.Eval
 import GHC.Core.DataCon
-import GHC.Types.Id as GHC
 import qualified GHC.Runtime.Debugger as GHCD
 import qualified GHC.Runtime.Heap.Inspect as GHCI
 

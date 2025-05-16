@@ -5,11 +5,6 @@ import Prelude hiding ((<>))
 
 import GHC
 import GHC.Utils.Outputable
-import GHC.Types.Id
-import GHC.Tc.Utils.TcType
-import GHC.Runtime.Eval
-import GHC.Types.Unique.Supply (uniqFromTag)
-import GHC.Types.Name.Env
 
 -- | A 'TermKey' serves to fetch a Term in a Debugger session.
 -- Note: A 'TermKey' is only valid in the stopped context it was created in.

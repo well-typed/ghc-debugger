@@ -3,16 +3,12 @@ module GHC.Debugger.Runtime where
 
 import Data.IORef
 import Control.Monad.Reader
-import Control.Monad.IO.Class
 import qualified Data.List as L
 
 import GHC
-import GHC.Types.Id
 import GHC.Types.FieldLabel
 import GHC.Tc.Utils.TcType
 import GHC.Runtime.Eval
-import GHC.Types.Unique.Supply (uniqFromTag)
-import GHC.Types.Name.Env
 
 import GHC.Debugger.Runtime.Term.Key
 import GHC.Debugger.Runtime.Term.Cache
