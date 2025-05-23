@@ -1,7 +1,6 @@
 {-# LANGUAGE CPP, RecordWildCards, LambdaCase #-}
 module Development.Debug.Adapter.Flags where
 
-import Data.Maybe
 import Data.Function
 import System.FilePath
 import System.Directory
@@ -28,6 +27,7 @@ hieBiosFlags root relTarget = runExceptT $ do
   let target = root </> relTarget
 
   explicitCradle <- HIE.findCradle target & liftIO
+  -- TODO: Use proper loggers here
   cradle <- maybe (HIE.loadImplicitCradle mempty target)
                   (HIE.loadCradle mempty) explicitCradle & liftIO
 
@@ -38,7 +38,7 @@ hieBiosFlags root relTarget = runExceptT $ do
   -- (HIE.getCompilerOptions depends on CWD being the proper root dir)
   let compilerOpts = liftIO $ withCurrentDirectory root $
 #if MIN_VERSION_hie_bios(0,14,0)
-                          HIE.getCompilerOptions target HIE.LoadFile cradle
+                          HIE.getCompilerOptions target (HIE.LoadWithContext [target]) cradle
 #else
                           HIE.getCompilerOptions target [] cradle
 #endif
@@ -50,17 +50,25 @@ hieBiosFlags root relTarget = runExceptT $ do
   -- ["-fwrite-if-simplified-core"] ++
 #endif
 
+  let (units', flags') = extractUnits flags
   return HieBiosFlags
-    { ghcInvocation = [ relTarget | not $ any (`L.isSuffixOf` target) flags ] ++ -- TODO is this correct? else, the debugger won't work on single files.
-                      flags ++ ghcDebuggerFlags
+    { ghcInvocation =  -- TODO is this correct? else, the debugger won't work on single files.
+                      flags' ++ ghcDebuggerFlags
     , libdir = libdir
-    , units  = mapMaybe (\case ("-unit", u) -> Just u; _ -> Nothing) $ zip flags (drop 1 flags)
+    , units  = units'
     }
   where
     unwrapCradleResult m = \case
       HIE.CradleNone     -> throwError $ "HIE.CradleNone\n" ++ m
       HIE.CradleFail err -> throwError $ unlines (HIE.cradleErrorStderr err) ++ "\n" ++ m
       HIE.CradleSuccess x -> return x
+
+extractUnits :: [String] -> ([String], [String])
+extractUnits = go [] []
+  where
+    go units rest ("-unit" : x : xs) = go (x : units) rest xs
+    go units rest (x : xs)           = go units (x : rest) xs
+    go units rest []                 = (reverse units, reverse rest)
 
 -- | Flags specific to ghc-debugger to append to all GHC invocations.
 ghcDebuggerFlags :: [String]

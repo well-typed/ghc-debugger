@@ -192,7 +192,7 @@ runDebugger dbg_out libdir units ghcInvocation' conf (Debugger action) = do
     -- TODO: Think about Note [GHCi and local Preludes] and what is done in `getImplicitPreludeImports`
     let preludeImp = GHC.IIDecl . GHC.simpleImportDecl $ GHC.mkModuleName "Prelude"
     mss <- getAllLoadedModules
-    GHC.setContext $ preludeImp : map (GHC.IIDecl . GHC.simpleImportDecl . GHC.ms_mod_name) mss
+    GHC.setContext $ preludeImp : map (GHC.IIModule . GHC.ms_mod) mss
 
     runReaderT action =<< initialDebuggerState
 
