@@ -1,7 +1,7 @@
 {
   "name": "haskell-debugger-extension",
   "displayName": "Haskell Debugger",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "romes",
   "description": "The GHC Haskell Debugger",
   "repository": "https://github.com/well-typed/ghc-debugger",
