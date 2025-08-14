@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GHC Debugger</title>
+
+  <style>
+    /* https://www.joshwcomeau.com/css/custom-css-reset/ */
+
+    /* 1. Use a more-intuitive box-sizing model */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    /* 2. Remove default margin */
+    * {
+      margin: 0;
+    }
+
+    /* 3. Enable keyword animations */
+    @media (prefers-reduced-motion: no-preference) {
+      html {
+        interpolate-size: allow-keywords;
+      }
+    }
+
+    body {
+      /* 4. Add accessible line-height */
+      line-height: 1.5;
+      /* 5. Improve text rendering */
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 6. Improve media defaults */
+    img, picture, video, canvas, svg {
+      display: block;
+      max-width: 100%;
+    }
+
+    /* 7. Inherit fonts for form controls */
+    input, button, textarea, select {
+      font: inherit;
+    }
+
+    /* 8. Avoid text overflows */
+    p, h1, h2, h3, h4, h5, h6 {
+      overflow-wrap: break-word;
+    }
+
+    /* 9. Improve line wrapping */
+    p {
+      text-wrap: pretty;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      text-wrap: balance;
+    }
+
+    /*
+      10. Create a root stacking context
+    */
+    #root, #__next {
+      isolation: isolate;
+    }
+
+    /* https://modernfontstacks.com/ */
+    body {
+        overflow-x: hidden;
+        background-color: #fffff9;
+        color: #111;
+
+        font-family: 'Iowan Old Style', 'Palatino Linotype', 'URW Palladio L', P052, serif;
+        font-weight: normal;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+    }
+
+    section {
+        position: relative;
+        display: flex;
+        align-items: center;
+        padding: 5rem 10vw 5rem 10vw;
+        gap: 1rem;
+        flex-direction: column;
+    }
+
+    @media (max-width: 800px) {
+      section, div {
+        flex-direction: column !important;
+      }
+    }
+
+    .wave {
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        width: 100%;
+        overflow: hidden;
+        line-height: 0;
+        z-index: -100;
+    }
+
+    pre > code {
+        display: block;
+        background-color: #fffff9;
+        color: #111;
+        padding: 1.33em;
+        border-radius: 0.33em;
+        font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+        font-weight: normal;
+    }
+
+    p {
+        margin-top: 1em;
+    }
+
+    nav {
+        align-items: center;
+        justify-content: center;
+        gap: 2em;
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    nav a {
+        text-decoration: none;
+        color: #111;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      background: #fffff9;
+    }
+    th, td {
+      border: 1px solid #e0e0e0;
+      padding: 0.6rem;
+      text-align: left;
+    }
+    th {
+      background: #f4f1e2;
+      font-weight: 600;
+    }
+
+    code.dark {
+      background: #5f5086;
+      color: #fffff9
+    }
+    table.dark {
+      background: #453a62;
+    }
+    table.dark th {
+      background: #5f5086;
+    }
+    table.dark a {
+      color: #fffff9
+    }
+
+    footer {
+        width: 100%;
+        text-align: center;
+        padding: 1em 2em;
+        font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+    <nav>
+        <p><a href="#installation">Installation</a></p>
+        <p><a href="#configuration">Configuration</a></p>
+        <p><a href="#talks">Talks</a></p>
+        <p><a href="https://github.com/well-typed/ghc-debugger">Source</a></p>
+    </nav>
+
+    <section style="flex-direction: row">
+    <div class="wave">
+       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="#453a62" fill-opacity="1" d="M0,96L26.7,133.3C53.3,171,107,245,160,261.3C213.3,277,267,235,320,224C373.3,213,427,235,480,208C533.3,181,587,107,640,69.3C693.3,32,747,32,800,53.3C853.3,75,907,117,960,138.7C1013.3,160,1067,160,1120,138.7C1173.3,117,1227,75,1280,74.7C1333.3,75,1387,117,1413,138.7L1440,160L1440,320L1413.3,320C1386.7,320,1333,320,1280,320C1226.7,320,1173,320,1120,320C1066.7,320,1013,320,960,320C906.7,320,853,320,800,320C746.7,320,693,320,640,320C586.7,320,533,320,480,320C426.7,320,373,320,320,320C266.7,320,213,320,160,320C106.7,320,53,320,27,320L0,320Z"></path></svg>
+    </div>
+
+    <div style="min-width: 20rem; max-width: 40rem; margin: auto">
+      <h1>GHC step-through debugger</h1>
+      <p>A modern debugger and debug adapter for Haskell &mdash; compatible with VSCode, Vim, and Emacs</p>
+
+      <p>All the features:</p>
+      <ul>
+          <li>Source breakpoints and break-on-exception</li>
+          <li>Step-in, step-out, step-over</li>
+          <li>Interactive variable inspection</li>
+          <ul>
+              <li>Naturally, thunks are supported</li>
+          </ul>
+          <!-- <li>Backtraces</li> -->
+          <li>Interactive REPL when stopped</li>
+      </ul>
+    </div>
+
+    <video style="border-radius: 1rem; margin: 1em auto; max-height: 593px" autoplay muted loop> <!--width="716" height="593"-->
+        <source src="out2.webm" type="video/webm">
+        Your browser does not support the video tag.
+    </video>
+
+    </section>
+
+
+    <section style="background-color:#453a62;color:#fffff9;">
+        <div style="max-width:50rem;">
+            <h2 id="installation" style="width:100%; text-align:right">
+                Installation Guide
+            </h2>
+            <p>
+                The executable <strong><code>ghc-debug-adapter</code></strong> is a standalone application which uses
+                the GHC library to implement the <a href="https://microsoft.github.io/debug-adapter-protocol/" style="color:#fffff9">Debug Adapter Protocol</a> (DAP)
+                for Haskell.
+            </p>
+            <p>
+                Any editor which supports DAP can be configured to step-through
+                Haskell code by using the <strong><code>ghc-debug-adapter</code></strong> tool.
+                This includes VSCode, Vim and Emacs.
+            </p>
+            <p>
+            First, the executable must be made available in <code>PATH</code>. It can be downloaded and installed from hackage with:
+            </p>
+            <pre style="margin: 1em 0"><code class="dark" style="width: 100%; font-size: 0.8rem">cabal install ghc-debugger:ghc-debug-adapter --program-suffix="-$(ghc --numeric-version)"</code></pre>
+            <p style="margin-top:0em; padding-top: 0em;"><em><code>ghc-debug-adapter</code> is only supported from GHC 9.14 onwards.</em></p>
+            <p style="margin-top:2em">
+            Second, your editor must be taught how to launch <code>ghc-debug-adapter</code>:
+            </p>
+            <table style="max-width: 50em" class="dark">
+            <colgroup>
+            <col style="width: 20%" />
+            <col style="width: 80%" />
+            </colgroup>
+            <thead>
+            <tr>
+            <th>Editor</th>
+            <th>Description</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+            <td>VSCode</td>
+            <td>Install the <a href="#">GHC Debugger VSCode extension</a>, select the debugger tab, and click the "Create launch.json" button followed by the green "Run" button.</td>
+            </tr>
+            <tr>
+            <td>Nvim</td>
+            <td>Install the <a href="https://github.com/mfussenegger/nvim-dap"><code>nvim-dap</code></a> plugin and configure it</td>
+            </tr>
+            <tr>
+            <td>Emacs</td>
+            <td>Install a DAP plugin and submit the instructions in a PR to ghc-debugger</td>
+            </tr>
+            </tbody>
+            </table>
+            <p>Usage varies depending on the editor. Please consult the editor documentation regarding the debugger controls, such as <a style="color:#fffff9" href="https://code.visualstudio.com/docs/debugtest/debugging">Debug code with Visual Studio Code </a></p>
+        </div>
+    </section>
+    <section>
+        <h2 id="configuration">
+            Configuration
+        </h2>
+        <p style="max-width: 50em">
+        The debugger is launched with the following properties customizing the
+        debugging session. In VSCode, these options can be set in the
+        <code>launch.json</code> file.
+        </p>
+        <table style="max-width: 50em">
+        <colgroup>
+        <col style="width: 20%" />
+        <col style="width: 80%" />
+        </colgroup>
+        <thead>
+        <tr>
+        <th>Setting</th>
+        <th>Description</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+        <td><code>entryFile</code></td>
+        <td>the relative path from the project root to the file with the entry
+            point for execution (e.g. <code>app/Main.hs</code>)</td>
+        </tr>
+        <tr>
+        <td><code>entryPoint</code></td>
+        <td>the name of the function that is called to start execution (e.g. <code>main</code>)</td>
+        </tr>
+        <tr>
+        <td><code>entryArgs</code></td>
+        <td>the arguments passed to the <code>entryPoint</code>; if the
+        <code>entryPoint</code> is <code>main</code>, these arguments are passed
+        as environment arguments (as in <code>getArgs</code>) rather than direct
+        function arguments (e.g. <code>[]</code>).</td>
+        </tr>
+        <tr>
+        <td><code>extraGhcArgs</code></td>
+        <td>additional flags to pass to the ghc invocation that loads the
+        program for debugging (e.g. <code>[]</code>)</td>
+        </tr>
+        </tbody>
+        </table>
+    </section>
+
+    <section style="background:#453a62; color:#fffff9">
+        <h2 id="talks">Talks</h2>
+        <div style="display: flex; flex-direction: row; gap: 1em; flex-wrap: wrap; margin: auto; text-align: center; margin-top: 1em">
+            <iframe width="560" height="315" src="https://www.youtube.com/embed/p-hBweQg42s?si=mjZ_G-p0jrJoy7yj" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+            <!-- <iframe width="560" height="315" src="https://www.youtube.com/embed/p-hBweQg42s?si=mjZ_G-p0jrJoy7yj" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe> -->
+        </div>
+    </section>
+
+    <footer  style="background:#453a62; color:#fffff9">
+        &copy; 2025 <a style="color:#fffff9" href="https://well-typed.com">Well-Typed, LLP</a>
+    </footer>
+
+</body>
+</html>
+
+
