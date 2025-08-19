@@ -33,6 +33,33 @@ function getFreePort(): Promise<number> {
 	});
 }
 
+function spawnDebugger(logger: vscode.OutputChannel, port: number) {
+    let adapterCmd = 'ghc-debug-adapter';
+
+    try {
+        // Get GHC version
+        const ghcVersion = cp.execSync('ghc --numeric-version', { encoding: 'utf8' }).trim();
+        const candidate = `ghc-debug-adapter-${ghcVersion}`;
+
+        // Check if candidate is in PATH
+        try {
+            cp.execSync(process.platform === 'win32'
+                ? `where ${candidate}`
+                : `command -v ${candidate}`);
+
+            logger.appendLine(`[Factory] Found debugger executable: ${candidate}`);
+
+            adapterCmd = candidate; // if found, use versioned adapter
+        } catch {
+            // Not found, fall back to default
+        }
+    } catch (err) {
+        console.warn("Could not determine GHC version, falling back to ghc-debug-adapter");
+    }
+
+    return cp.spawn(adapterCmd, ['--port', port.toString()]);
+}
+
 let logger : vscode.OutputChannel = vscode.window.createOutputChannel("ghc-debug-adapter");
 
 export function activate(context: vscode.ExtensionContext) {
@@ -184,10 +211,10 @@ class GHCDebugAdapterServerDescriptorFactory implements vscode.DebugAdapterDescr
 		this.logger.appendLine(`[Factory] Launching ghc-debugger on port ${port}`);
 
 		// const debuggerProcess = cp.spawn('ghc-debug-adapter', ['--port', port.toString(), "+RTS", "-pj"], {cwd: "/var/folders/tv/35hlch6s3y15hfvndc71l6d40000gn/T/tmp.7Vsfzyoozc"});
-		const debuggerProcess = cp.spawn('ghc-debug-adapter', ['--port', port.toString()]);
+		const debuggerProcess = spawnDebugger(logger, port);
 
         debuggerProcess.on('spawn', () => {
-            this.logger.appendLine('[Factory] ghc-debugger spawned...');
+            this.logger.appendLine('[Factory] debugger executable spawned...');
         });
 
 		debuggerProcess.stdout.on('data', (data) => {
