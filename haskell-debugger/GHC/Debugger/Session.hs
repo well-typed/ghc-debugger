@@ -1,4 +1,4 @@
-{-# LANGUAGE DerivingStrategies, CPP #-}
+{-# LANGUAGE DerivingStrategies, CPP, RecordWildCards #-}
 
 -- | Initialise the GHC session for one or more home units.
 --
@@ -10,11 +10,32 @@ module GHC.Debugger.Session (
   TargetDetails(..),
   Target(..),
   toGhcTarget,
+  CacheDirs(..),
+  getCacheDirs,
+  -- * DynFlags modifications
+  setWorkingDirectory,
+  setCacheDirs,
+  writeInterfaces,
+  setBytecodeBackend,
+  enableByteCodeGeneration,
   )
   where
 
 import Control.Monad
 import Control.Monad.IO.Class
+import qualified Crypto.Hash.SHA1                    as H
+import qualified Data.ByteString.Base16              as B16
+import qualified Data.ByteString.Char8               as B
+import Data.Function
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map as Map
+import qualified Data.List as L
+import qualified Data.Containers.ListUtils as L
+import GHC.ResponseFile (expandResponse)
+import HIE.Bios.Environment as HIE
+import System.FilePath
+import qualified System.Directory as Directory
+import qualified System.Environment as Env
 
 import qualified GHC
 import GHC.Driver.DynFlags as GHC
@@ -29,14 +50,6 @@ import qualified GHC.Unit.State                        as State
 import GHC.Driver.Env
 import GHC.Types.SrcLoc
 import Language.Haskell.Syntax.Module.Name
-
-import qualified Data.List.NonEmpty as NonEmpty
-import qualified Data.Map as Map
-import qualified Data.List as L
-import qualified Data.Containers.ListUtils as L
-import GHC.ResponseFile (expandResponse)
-import HIE.Bios.Environment as HIE
-import System.FilePath
 
 -- | Throws if package flags are unsatisfiable
 parseHomeUnitArguments :: GhcMonad m
@@ -80,13 +93,16 @@ parseHomeUnitArguments cfp compRoot units theOpts dflags rootDir = do
           initOne args
       initOne this_opts = do
         (dflags', targets') <- addCmdOpts this_opts dflags
-
         let targets = HIE.makeTargetsAbsolute root targets'
             root = case workingDirectory dflags' of
               Nothing   -> compRoot
               Just wdir -> compRoot </> wdir
+        cacheDirs <- liftIO $ getCacheDirs (takeFileName root) this_opts
         let dflags'' =
               setWorkingDirectory root $
+              setCacheDirs cacheDirs $
+              enableByteCodeGeneration $
+              setBytecodeBackend $
               makeDynFlagsAbsolute compRoot -- makeDynFlagsAbsolute already accounts for workingDirectory
               dflags'
         return (dflags'', targets)
@@ -228,8 +244,78 @@ mkSimpleTarget df fp = GHC.Target (GHC.TargetFile fp Nothing) True (homeUnitId_ 
 hscSetUnitEnv :: UnitEnv -> HscEnv -> HscEnv
 hscSetUnitEnv ue env = env { hsc_unit_env = ue }
 
+-- ----------------------------------------------------------------------------
+-- Session cache directory
+-- ----------------------------------------------------------------------------
+
+data CacheDirs = CacheDirs
+  { hiCacheDir :: FilePath
+  , byteCodeCacheDir :: FilePath
+  , hieCacheDir :: FilePath
+  , objCacheDir :: FilePath
+  }
+
+getCacheDirs :: String -> [String] -> IO CacheDirs
+getCacheDirs prefix opts = do
+  mCacheDir <- Env.lookupEnv "HDB_CACHE_DIR"
+  rootDir <- case mCacheDir of
+    Just dir -> pure dir
+    Nothing ->
+      Directory.getXdgDirectory Directory.XdgCache "hdb"
+  let sessionCacheDir = rootDir </> prefix ++ "-" ++ opts_hash
+  Directory.createDirectoryIfMissing True sessionCacheDir
+  pure CacheDirs
+    { hiCacheDir = sessionCacheDir
+    , byteCodeCacheDir = sessionCacheDir
+    , hieCacheDir = sessionCacheDir
+    , objCacheDir = sessionCacheDir
+    }
+  where
+    -- Create a unique folder per set of different GHC options, assuming that each different set of
+    -- GHC options will create incompatible interface files.
+    opts_hash = B.unpack $ B16.encode $ H.finalize $ H.updates H.init (map B.pack opts)
+
+-- ----------------------------------------------------------------------------
+-- Modification of DynFlags
+-- ----------------------------------------------------------------------------
+
 setWorkingDirectory :: FilePath -> DynFlags -> DynFlags
 setWorkingDirectory p d = d { workingDirectory =  Just p }
+
+setCacheDirs :: CacheDirs -> DynFlags -> DynFlags
+setCacheDirs CacheDirs{..} flags = flags
+  { hiDir = Just hiCacheDir
+  , hieDir = Just hieCacheDir
+  , objectDir = Just objCacheDir
+#if MIN_VERSION_ghc(9,14,2)
+  , bytecodeDir = Just byteCodeCacheDir
+#endif
+  }
+
+enableByteCodeGeneration :: DynFlags -> DynFlags
+enableByteCodeGeneration dflags =
+#if MIN_VERSION_ghc(9,14,2)
+  dflags
+    & flip gopt_unset Opt_ByteCodeAndObjectCode
+    & flip gopt_set Opt_ByteCode
+    & flip gopt_set Opt_WriteByteCode
+#else
+  gopt_set dflags Opt_WriteIfSimplifiedCore
+#endif
+
+writeInterfaces :: DynFlags -> DynFlags
+writeInterfaces dflags =
+  gopt_set dflags Opt_WriteInterface
+
+setBytecodeBackend :: DynFlags -> DynFlags
+setBytecodeBackend dflags = dflags
+  {
+#if MIN_VERSION_ghc(9,14,2)
+  backend = GHC.bytecodeBackend
+#else
+  backend = GHC.interpreterBackend
+#endif
+  }
 
 -- ----------------------------------------------------------------------------
 -- Utils that we need, but don't want to incur an additional dependency for.
