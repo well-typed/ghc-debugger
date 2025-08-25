@@ -23,7 +23,6 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import GHC.IO.Handle.FD
 
-
 defaultStdoutForwardingAction :: T.Text -> IO ()
 defaultStdoutForwardingAction line = do
   T.hPutStrLn stderr ("[INTERCEPTED STDOUT] " <> line)
@@ -37,8 +36,10 @@ main = do
   withInterceptedStdoutForwarding defaultStdoutForwardingAction $ \realStdout -> do
     hSetBuffering realStdout LineBuffering
     l <- handleLogger realStdout
-    let loggerWithSev = cmap (renderWithSeverity id) l
-    runDAPServerWithLogger (cmap renderDAPLog l) config (talk loggerWithSev)
+    let
+      timeStampLogger = cmapIO renderWithTimestamp l
+      loggerWithSev = cmap (renderWithSeverity id) timeStampLogger
+    runDAPServerWithLogger (cmap renderDAPLog timeStampLogger) config (talk loggerWithSev)
 
 -- | Fetch config from environment, fallback to sane defaults
 getConfig :: Int -> IO ServerConfig

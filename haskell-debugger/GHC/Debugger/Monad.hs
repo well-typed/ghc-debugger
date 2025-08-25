@@ -1,4 +1,12 @@
-{-# LANGUAGE BangPatterns, CPP, GeneralizedNewtypeDeriving, NamedFieldPuns, TupleSections, LambdaCase, OverloadedRecordDot, TypeApplications #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
+
 module GHC.Debugger.Monad where
 
 import Prelude hiding (mod)
@@ -108,15 +116,12 @@ runDebugger :: Handle     -- ^ The handle to which GHC's output is logged. The d
             -> IO a
 runDebugger dbg_out rootDir compDir libdir units ghcInvocation' mainFp conf (Debugger action) = do
   let ghcInvocation = filter (\case ('-':'B':_) -> False; _ -> True) ghcInvocation'
-
   GHC.runGhc (Just libdir) $ do
     -- Workaround #4162
     _ <- liftIO $ installHandler sigINT Default Nothing
     dflags0 <- GHC.getSessionDynFlags
-
     let dflags1 = dflags0
           { GHC.ghcMode = GHC.CompManager
-          , GHC.backend = GHC.interpreterBackend
           , GHC.ghcLink = GHC.LinkInMemory
           , GHC.verbosity = 1
           , GHC.canUseColor = conf.supportsANSIStyling
@@ -128,6 +133,9 @@ runDebugger dbg_out rootDir compDir libdir units ghcInvocation' mainFp conf (Deb
           `GHC.gopt_set` GHC.Opt_IgnoreHpcChanges
           `GHC.gopt_set` GHC.Opt_UseBytecodeRatherThanObjects
           `GHC.gopt_set` GHC.Opt_InsertBreakpoints
+          & setBytecodeBackend
+          & enableByteCodeGeneration
+          & writeInterfaces
 
     GHC.modifyLogger $
       -- Override the logger to output to the given handle
@@ -162,6 +170,7 @@ runDebugger dbg_out rootDir compDir libdir units ghcInvocation' mainFp conf (Deb
     GHC.setContext $ preludeImp : map (GHC.IIModule . GHC.ms_mod) mss
 
     runReaderT action =<< initialDebuggerState
+
 
 -- | The logger action used to log GHC output
 debuggerLoggerAction :: Handle -> LogAction
