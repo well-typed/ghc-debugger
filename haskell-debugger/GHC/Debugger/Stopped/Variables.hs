@@ -10,6 +10,7 @@ import GHC
 import GHC.Types.FieldLabel
 import GHC.Runtime.Eval
 import GHC.Core.DataCon
+import GHC.Core.TyCo.Rep
 import qualified GHC.Runtime.Debugger as GHCD
 import qualified GHC.Runtime.Heap.Inspect as GHCI
 
@@ -73,10 +74,20 @@ termToVarInfo :: TermKey -> Term -> Debugger VarInfo
 termToVarInfo key term0 = do
   -- Make a VarInfo for a term
   let
-    isThunk
-     | Suspension{} <- term0 = True
-     | otherwise = False
     ty = GHCI.termType term0
+
+    -- Check for function types explicitly since they seem to always match Suspension
+    -- but should not be shown as thunks in the UI.
+    checkFn (FunTy _ _ _ _) = True
+    checkFn (ForAllTy _ t) = checkFn t
+    checkFn _ = False
+    isFn = checkFn ty
+
+    isThunk = if not isFn then
+      case term0 of
+        Suspension{} -> True
+        _ -> False
+      else False
 
   term <- if not isThunk && isBoringTy ty
             then forceTerm key term0 -- make sure that if it's an evaluated boring term then it is /fully/ evaluated.
@@ -94,7 +105,10 @@ termToVarInfo key term0 = do
          _                         -> t
   varName <- display key
   varType <- display ty
-  varValue <- display =<< GHCD.showTerm (termHead term)
+  -- Pass type as value for functions since actual value is useless
+  varValue <- if isFn
+    then pure $ "<fn> :: " ++ varType
+    else display =<< GHCD.showTerm (termHead term)
   -- liftIO $ print (varName, varType, varValue, GHCI.isFullyEvaluatedTerm term)
 
   -- The VarReference allows user to expand variable structure and inspect its value.
